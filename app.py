@@ -6,12 +6,11 @@ from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-import streamlit as st
 
 # Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
 
-# Configuración del modelo LLM
+# LLM model configuration
 llm = ChatOpenAI(
     model_name="gpt-4",
     temperature=0,
@@ -19,7 +18,7 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
-# Definir los schemas de respuesta para el parser
+# Define the response schemas for the parser
 response_schemas = [
     ResponseSchema(name="trans_date", description="Transaction date"),
     ResponseSchema(name="description", description="The transaction description"),
@@ -30,7 +29,7 @@ response_schemas = [
 
 output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
-# Definir el prompt template para la extracción de transacciones
+# Define the prompt template for transaction extraction
 prompt_template = """
 Extract the following information from the provided bank statement text in JSON format:
 Transaction Date, Description, Amount (include sign if it's negative or a debit transaction), Currency (if mentioned), and Type of transaction (Debit or Credit).
@@ -53,13 +52,13 @@ transaction_prompt = PromptTemplate(
     output_parser=output_parser
 )
 
-# Crear la cadena de LLM para la extracción de transacciones
+# Create the LLM chain for transaction extraction
 transaction_chain = LLMChain(
     llm=llm,
     prompt=transaction_prompt
 )
 
-# Función para extraer texto de un archivo PDF
+# Function to extract text from a PDF file
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     text = ""
@@ -67,7 +66,7 @@ def extract_text_from_pdf(pdf_file):
         text += page.get_text("text")
     return text
 
-# Configuración de la interfaz de Streamlit
+# Streamlit interface setup
 st.title("PDF Bank Statement Transaction Extractor")
 st.write("Upload a PDF bank statement to extract transactions.")
 
@@ -78,11 +77,11 @@ if st.button("Process PDFs"):
 
     if uploaded_files:
         for uploaded_file in uploaded_files:
-            # Extraer texto del archivo PDF
+            # Extract text from the PDF file
             extracted_text = extract_text_from_pdf(uploaded_file)
             processed_texts = extracted_text.split("\n")
 
-            # Extracción de transacciones usando LLM
+            # Transaction extraction using LLM
             for idx, text in enumerate(processed_texts):
                 transactions_data = transaction_chain.predict(text=text)
                 try:
@@ -93,14 +92,14 @@ if st.button("Process PDFs"):
                     st.error(f"Error decoding JSON for part {idx + 1} of {uploaded_file.name}")
 
         if all_transactions:
-            # Convertir los datos de transacciones a un DataFrame de pandas
+            # Convert the transaction data into a pandas DataFrame
             df_transactions = pd.DataFrame(all_transactions)
 
-            # Mostrar las transacciones en la app
+            # Display the transactions in the app
             st.write("Extracted Transactions")
             st.dataframe(df_transactions)
 
-            # Opción para descargar el archivo Excel
+            # Option to download the Excel file
             st.download_button(
                 label="Download transactions as Excel",
                 data=df_transactions.to_excel(index=False),
