@@ -6,10 +6,10 @@ from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+import streamlit as st
 
-# Cargar la clave de API
-with open("api_key.txt", "r") as file:
-    openai_api_key = file.read().strip()
+# Accessing the API key from Streamlit's secrets
+openai_api_key = st.secrets["openai"]["api_key"]
 
 # Configuración del modelo LLM
 llm = ChatOpenAI(
