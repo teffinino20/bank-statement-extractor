@@ -42,7 +42,6 @@ Avoid information related to: "Previous Balance", "Payments/Credits", "New Charg
         "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
         "Due Date"
         
-Ignore values than don't have a description.
 Ensure the JSON is properly formatted with no additional text.
 
 Bank Statement:
