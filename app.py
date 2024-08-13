@@ -105,22 +105,15 @@ if st.button("Process PDFs"):
             processed_texts = split_text(cleaned_text)
 
             # Extract transactions using LLM
-            for part_idx, text in enumerate(processed_texts):
+            for text in processed_texts:
                 transactions_data = transaction_chain.predict(text=text)
-                st.write(f"Processing part {part_idx + 1}...")
 
-                # Print raw output for debugging
-                st.write(f"Raw output for part {part_idx + 1}:\n{transactions_data}\n")
-                
                 try:
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
-                    else:
-                        st.error(f"Output is not a valid list for part {part_idx + 1}.")
-                except json.JSONDecodeError as e:
-                    st.error(f"Error decoding JSON for part {part_idx + 1} of {uploaded_file.name}: {e}")
-                    st.error(f"Raw output: {transactions_data}")
+                except json.JSONDecodeError:
+                    continue  # Skip any parts that can't be decoded
 
         if all_transactions:
             # Convert the transaction data into a pandas DataFrame
