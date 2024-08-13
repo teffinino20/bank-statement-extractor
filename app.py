@@ -41,8 +41,8 @@ Avoid information related to: "Previous Balance", "Payments/Credits", "New Charg
         "Closing balance", "Account Summary", "Account Activity Details", 
         "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
         "Due Date"
-Ignore transactions without a description.
-Provide the output strictly in valid JSON format.
+Ignore transaction than don't have a description.
+Provide the output strictly in valid JSON format without additional explanations or comments.
 
 Bank Statement:
 {text}
@@ -87,7 +87,7 @@ def clean_text(text):
             continue
         cleaned_lines.append(line)
     
-    return '\n'.join(cleaned_lines)
+    return '\n.join(cleaned_lines)
 
 # Split text into smaller parts
 def split_text(text, max_length=3000):
@@ -131,14 +131,14 @@ if st.button("Process PDFs"):
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 df_transactions.to_excel(writer, index=False)
-                writer.save()
 
             st.download_button(
                 label="Download transactions as Excel",
-                data=buffer,
+                data=buffer.getvalue(),
                 file_name="transactions.xlsx"
             )
         else:
             st.warning("No transactions were identified.")
     else:
         st.warning("Please upload at least one PDF file.")
+
