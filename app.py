@@ -88,6 +88,11 @@ def clean_text(text):
     
     return '\n'.join(cleaned_lines)
 
+# Split text in smaller parts
+def split_text(text, max_length=3000):
+    """Split the text into smaller parts with a specified maximum length."""
+    return [text[i:i+max_length] for i in range(0, len(text), max_length)]
+
 # Configuración de la interfaz de Streamlit
 st.title("PDF Bank Statement Transaction Extractor")
 st.write("Upload a PDF bank statement to extract transactions.")
@@ -106,14 +111,22 @@ if st.button("Process PDFs"):
             extracted_text = extract_text_from_pdf(uploaded_file)
             cleaned_text = clean_text(extracted_text)
 
+            # Split cleaned text into smaller parts
+            parts = split_text(cleaned_text)
+            
             # Extracción de transacciones usando LLM
-            transactions_data = transaction_chain.predict(text=cleaned_text)
-            try:
-                parsed_transactions = json.loads(transactions_data)
-                if isinstance(parsed_transactions, list):
-                    all_transactions.extend(parsed_transactions)
-            except json.JSONDecodeError:
-                st.error(f"Error decoding JSON for {uploaded_file.name}")
+            for part in parts:
+                try:
+                    transactions_data = transaction_chain.predict(text=part)
+                    parsed_transactions = json.loads(transactions_data)
+                    if isinstance(parsed_transactions, list):
+                        all_transactions.extend(parsed_transactions)
+                except json.JSONDecodeError:
+                    st.error(f"Error decoding JSON for {uploaded_file.name}")
+                except openai.error.OpenAIError as e:
+                    st.error(f"OpenAI API error: {str(e)}")
+                except Exception as e:
+                    st.error(f"Unexpected error: {str(e)}")
 
             # Update progress bar
             progress_bar.progress((i + 1) / total_files)
@@ -144,4 +157,5 @@ if st.button("Process PDFs"):
     end_time = time.time()
     elapsed_time = end_time - start_time
     st.write(f"Processing time: {elapsed_time:.2f} seconds")
+
 
