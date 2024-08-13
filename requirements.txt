@@ -1,6 +1,6 @@
 streamlit
-pymupdf
+fitz
 pandas
 openai
 langchain-openai
-langchain
+xlsxwrite
