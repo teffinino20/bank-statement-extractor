@@ -10,7 +10,7 @@ from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 # Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
 
-# LLM model configuration
+# Configuring the LLM model
 llm = ChatOpenAI(
     model_name="gpt-4",
     temperature=0,
@@ -66,7 +66,7 @@ def extract_text_from_pdf(pdf_file):
         text += page.get_text("text")
     return text
 
-# Streamlit interface setup
+# Streamlit app configuration
 st.title("PDF Bank Statement Transaction Extractor")
 st.write("Upload a PDF bank statement to extract transactions.")
 
@@ -81,9 +81,10 @@ if st.button("Process PDFs"):
             extracted_text = extract_text_from_pdf(uploaded_file)
             processed_texts = extracted_text.split("\n")
 
-            # Transaction extraction using LLM
+            # Extract transactions using LLM
             for idx, text in enumerate(processed_texts):
                 transactions_data = transaction_chain.predict(text=text)
+                st.write(f"Raw output for part {idx + 1}:\n{transactions_data}\n")  # Log the raw output
                 try:
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
