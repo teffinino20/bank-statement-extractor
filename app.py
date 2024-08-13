@@ -10,16 +10,16 @@ from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 # Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
 
-# Define function to extract the text from the PDFs
-def extract_text_from_pdf(pdf_file):
-    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+# Function to extract text from PDFs
+def extract_text_from_pdf(pdf_path):
+    doc = fitz.open(pdf_path)
     text = ""
     for page_num in range(len(doc)):
         page = doc.load_page(page_num)
         text += page.get_text("text")
     return text
 
-# Define function to remove non-relevant information from the text
+# Function to clean the text by removing non-relevant information
 def clean_text(text):
     """Clean the text by removing non-relevant information."""
     lines = text.split('\n')
@@ -39,12 +39,12 @@ def clean_text(text):
     
     return '\n'.join(cleaned_lines)
 
-# Split text into smaller parts
+# Function to split the text into smaller parts
 def split_text(text, max_length=3000):
     """Split the text into smaller parts with a specified maximum length."""
     return [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
-# Configuring the LLM
+# LLM Configuration
 llm = ChatOpenAI(
     model_name="gpt-4",
     temperature=0,
@@ -65,14 +65,10 @@ output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
 # Define the prompt template for transaction extraction
 prompt_template = """
-Extract the following information from the provided bank statement text in JSON format:
+Extract the following information from the provided bank statement text in a strict JSON format:
 Transaction Date, Description, Amount (include sign if it's negative or a debit transaction), Currency (if mentioned), and Type of transaction (Debit or Credit).
 
-Avoid information related to: "Previous Balance", "Payments/Credits", "New Charges", 
-        "Fees", "Interest Charged", "Balance", "Total", "Opening balance", 
-        "Closing balance", "Account Summary", "Account Activity Details", 
-        "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
-        "Due Date"
+Ensure the JSON is properly formatted with no additional text.
 
 Bank Statement:
 {text}
@@ -92,7 +88,7 @@ transaction_chain = LLMChain(
     prompt=transaction_prompt
 )
 
-# Streamlit UI
+# Streamlit UI Configuration
 st.title("PDF Bank Statement Transaction Extractor")
 st.write("Upload a PDF bank statement to extract transactions.")
 
@@ -103,34 +99,38 @@ if st.button("Process PDFs"):
 
     if uploaded_files:
         for uploaded_file in uploaded_files:
-            # Extract and clean the text from the PDF
+            # Extract text from the uploaded PDF
             extracted_text = extract_text_from_pdf(uploaded_file)
             cleaned_text = clean_text(extracted_text)
             processed_texts = split_text(cleaned_text)
 
-            # Process each part of the text
-            for idx, text in enumerate(processed_texts):
-                st.write(f"Processing part {idx + 1}")
+            # Extract transactions using LLM
+            for part_idx, text in enumerate(processed_texts):
+                transactions_data = transaction_chain.predict(text=text)
+                st.write(f"Processing part {part_idx + 1}...")
+
+                # Print raw output for debugging
+                st.write(f"Raw output for part {part_idx + 1}:\n{transactions_data}\n")
+                
                 try:
-                    transactions_data = transaction_chain.predict(text=text)
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
                     else:
-                        st.warning(f"No valid transactions found in part {idx + 1} of {uploaded_file.name}")
-                except json.JSONDecodeError:
-                    st.error(f"Error decoding JSON for part {idx + 1} of {uploaded_file.name}")
-                except openai.error.OpenAIError as e:
-                    st.error(f"OpenAI API error: {e}")
-                    break
+                        st.error(f"Output is not a valid list for part {part_idx + 1}.")
+                except json.JSONDecodeError as e:
+                    st.error(f"Error decoding JSON for part {part_idx + 1} of {uploaded_file.name}: {e}")
+                    st.error(f"Raw output: {transactions_data}")
 
         if all_transactions:
             # Convert the transaction data into a pandas DataFrame
             df_transactions = pd.DataFrame(all_transactions)
+
+            # Display the transactions in the app
             st.write("Extracted Transactions")
             st.dataframe(df_transactions)
 
-            # Provide option to download the Excel file
+            # Option to download the Excel file
             st.download_button(
                 label="Download transactions as Excel",
                 data=df_transactions.to_excel(index=False),
