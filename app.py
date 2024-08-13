@@ -10,7 +10,41 @@ from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 # Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
 
-# Configuring the LLM model
+# Define function to extract the text from the PDFs
+def extract_text_from_pdf(pdf_file):
+    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+    text = ""
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        text += page.get_text("text")
+    return text
+
+# Define function to remove non-relevant information from the text
+def clean_text(text):
+    """Clean the text by removing non-relevant information."""
+    lines = text.split('\n')
+    cleaned_lines = []
+    summary_keywords = [
+        "Previous Balance", "Payments/Credits", "New Charges", 
+        "Fees", "Interest Charged", "Balance", "Total", "Opening balance", 
+        "Closing balance", "Account Summary", "Account Activity Details", 
+        "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
+        "Due Date"
+    ]
+    
+    for line in lines:
+        if any(keyword in line for keyword in summary_keywords):
+            continue
+        cleaned_lines.append(line)
+    
+    return '\n'.join(cleaned_lines)
+
+# Split text into smaller parts
+def split_text(text, max_length=3000):
+    """Split the text into smaller parts with a specified maximum length."""
+    return [text[i:i+max_length] for i in range(0, len(text), max_length)]
+
+# Configuring the LLM
 llm = ChatOpenAI(
     model_name="gpt-4",
     temperature=0,
@@ -58,15 +92,7 @@ transaction_chain = LLMChain(
     prompt=transaction_prompt
 )
 
-# Function to extract text from a PDF file
-def extract_text_from_pdf(pdf_file):
-    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-    text = ""
-    for page in doc:
-        text += page.get_text("text")
-    return text
-
-# Streamlit app configuration
+# Streamlit UI
 st.title("PDF Bank Statement Transaction Extractor")
 st.write("Upload a PDF bank statement to extract transactions.")
 
@@ -77,30 +103,34 @@ if st.button("Process PDFs"):
 
     if uploaded_files:
         for uploaded_file in uploaded_files:
-            # Extract text from the PDF file
+            # Extract and clean the text from the PDF
             extracted_text = extract_text_from_pdf(uploaded_file)
-            processed_texts = extracted_text.split("\n")
+            cleaned_text = clean_text(extracted_text)
+            processed_texts = split_text(cleaned_text)
 
-            # Extract transactions using LLM
+            # Process each part of the text
             for idx, text in enumerate(processed_texts):
-                transactions_data = transaction_chain.predict(text=text)
-                st.write(f"Raw output for part {idx + 1}:\n{transactions_data}\n")  # Log the raw output
+                st.write(f"Processing part {idx + 1}")
                 try:
+                    transactions_data = transaction_chain.predict(text=text)
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
+                    else:
+                        st.warning(f"No valid transactions found in part {idx + 1} of {uploaded_file.name}")
                 except json.JSONDecodeError:
                     st.error(f"Error decoding JSON for part {idx + 1} of {uploaded_file.name}")
+                except openai.error.OpenAIError as e:
+                    st.error(f"OpenAI API error: {e}")
+                    break
 
         if all_transactions:
             # Convert the transaction data into a pandas DataFrame
             df_transactions = pd.DataFrame(all_transactions)
-
-            # Display the transactions in the app
             st.write("Extracted Transactions")
             st.dataframe(df_transactions)
 
-            # Option to download the Excel file
+            # Provide option to download the Excel file
             st.download_button(
                 label="Download transactions as Excel",
                 data=df_transactions.to_excel(index=False),
