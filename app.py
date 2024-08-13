@@ -40,11 +40,6 @@ def clean_text(text):
     
     return '\n'.join(cleaned_lines)
 
-# Function to split the text into smaller parts
-def split_text(text, max_length=3000):
-    """Split the text into smaller parts with a specified maximum length."""
-    return [text[i:i+max_length] for i in range(0, len(text), max_length)]
-
 # LLM Configuration
 llm = ChatOpenAI(
     model_name="gpt-4",
@@ -103,18 +98,16 @@ if st.button("Process PDFs"):
             # Extract text from the uploaded PDF
             extracted_text = extract_text_from_pdf(uploaded_file)
             cleaned_text = clean_text(extracted_text)
-            processed_texts = split_text(cleaned_text)
 
             # Extract transactions using LLM
-            for text in processed_texts:
-                transactions_data = transaction_chain.predict(text=text)
+            transactions_data = transaction_chain.predict(text=cleaned_text)
 
-                try:
-                    parsed_transactions = json.loads(transactions_data)
-                    if isinstance(parsed_transactions, list):
-                        all_transactions.extend(parsed_transactions)
-                except json.JSONDecodeError:
-                    continue  # Skip any parts that can't be decoded
+            try:
+                parsed_transactions = json.loads(transactions_data)
+                if isinstance(parsed_transactions, list):
+                    all_transactions.extend(parsed_transactions)
+            except json.JSONDecodeError:
+                st.error(f"Error decoding JSON for {uploaded_file.name}")
 
         if all_transactions:
             # Convert the transaction data into a pandas DataFrame
