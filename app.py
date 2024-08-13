@@ -6,6 +6,7 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 import streamlit as st
+import io
 import time
 
 # Accessing the API key from Streamlit's secrets
@@ -40,10 +41,8 @@ Avoid information related to: "Previous Balance", "Payments/Credits", "New Charg
         "Closing balance", "Account Summary", "Account Activity Details", 
         "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
         "Due Date"
-
-Ignore transaction if they don't have a description.
-
-Provide the output strictly in valid JSON format without additional explanations or comments.
+Ignore transactions without a description.
+Provide the output strictly in valid JSON format.
 
 Bank Statement:
 {text}
@@ -112,17 +111,13 @@ if st.button("Process PDFs"):
 
             for idx, text in enumerate(text_parts):
                 transactions_data = transaction_chain.predict(text=text)
-                st.write(f"Processing part {idx + 1} of {uploaded_file.name}")
 
                 try:
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
-                    else:
-                        st.warning(f"No valid transactions found in the output for part {idx + 1}.")
-                except json.JSONDecodeError as e:
-                    st.error(f"Error decoding JSON for part {idx + 1} of {uploaded_file.name}: {e}")
-                    st.write(f"Raw output for part {idx + 1}:\n{transactions_data}")
+                except json.JSONDecodeError:
+                    pass  # Silently ignore the error and continue
 
         end_time = time.time()
         elapsed_time = end_time - start_time
@@ -147,4 +142,3 @@ if st.button("Process PDFs"):
             st.warning("No transactions were identified.")
     else:
         st.warning("Please upload at least one PDF file.")
-
