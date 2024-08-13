@@ -12,7 +12,7 @@ from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 # Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
 
-# Configuración del modelo LLM
+# LLM model configuration
 llm = ChatOpenAI(
     model_name="gpt-4",
     temperature=0,
@@ -20,7 +20,7 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
-# Definir los schemas de respuesta para el parser
+# Define the response schemas for the parser
 response_schemas = [
     ResponseSchema(name="trans_date", description="Transaction date"),
     ResponseSchema(name="description", description="The transaction description"),
@@ -31,7 +31,7 @@ response_schemas = [
 
 output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
-# Definir el prompt template para la extracción de transacciones
+# Define the prompt template for transaction extraction
 prompt_template = """
 Extract the following information from the provided bank statement text in JSON format:
 Transaction Date, Description, Amount (include sign if it's negative or a debit transaction), Currency (if mentioned), and Type of transaction (Debit or Credit).
@@ -54,13 +54,13 @@ transaction_prompt = PromptTemplate(
     output_parser=output_parser
 )
 
-# Crear la cadena de LLM para la extracción de transacciones
+# Create the LLM chain for transaction extraction
 transaction_chain = LLMChain(
     llm=llm,
     prompt=transaction_prompt
 )
 
-# Función para extraer texto de un archivo PDF
+# Function to extract text from a PDF file
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     text = ""
@@ -68,7 +68,7 @@ def extract_text_from_pdf(pdf_file):
         text += page.get_text("text")
     return text
 
-# Función para limpiar el texto
+# Function to clean the text
 def clean_text(text):
     """Clean the text by removing non-relevant information."""
     lines = text.split('\n')
@@ -88,12 +88,12 @@ def clean_text(text):
     
     return '\n'.join(cleaned_lines)
 
-# Split text in smaller parts
+# Function to split text into smaller parts
 def split_text(text, max_length=3000):
     """Split the text into smaller parts with a specified maximum length."""
-    return [text[i:i+max_length] for i in range(0, len(text), max_length)]
+    return [text[i:i + max_length] for i in range(0, len(text), max_length)]
 
-# Configuración de la interfaz de Streamlit
+# Streamlit interface configuration
 st.title("PDF Bank Statement Transaction Extractor")
 st.write("Upload a PDF bank statement to extract transactions.")
 
@@ -102,44 +102,37 @@ uploaded_files = st.file_uploader("Choose PDF files", type="pdf", accept_multipl
 if st.button("Process PDFs"):
     all_transactions = []
     start_time = time.time()
-    progress_bar = st.progress(0)
-    total_files = len(uploaded_files)
 
     if uploaded_files:
-        for i, uploaded_file in enumerate(uploaded_files):
-            # Extraer texto del archivo PDF
+        for uploaded_file in uploaded_files:
+            # Extract text from the PDF file
             extracted_text = extract_text_from_pdf(uploaded_file)
             cleaned_text = clean_text(extracted_text)
+            text_parts = split_text(cleaned_text)
 
-            # Split cleaned text into smaller parts
-            parts = split_text(cleaned_text)
-            
-            # Extracción de transacciones usando LLM
-            for part in parts:
+            # Extract transactions using LLM
+            for idx, part in enumerate(text_parts):
                 try:
                     transactions_data = transaction_chain.predict(text=part)
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
                 except json.JSONDecodeError:
-                    st.error(f"Error decoding JSON for {uploaded_file.name}")
+                    st.error(f"Error decoding JSON for part {idx + 1} of {uploaded_file.name}")
                 except openai.error.OpenAIError as e:
                     st.error(f"OpenAI API error: {str(e)}")
                 except Exception as e:
                     st.error(f"Unexpected error: {str(e)}")
 
-            # Update progress bar
-            progress_bar.progress((i + 1) / total_files)
-
         if all_transactions:
-            # Convertir los datos de transacciones a un DataFrame de pandas
+            # Convert the transaction data into a pandas DataFrame
             df_transactions = pd.DataFrame(all_transactions)
 
-            # Mostrar las transacciones en la app
+            # Display the transactions in the app
             st.write("Extracted Transactions")
             st.dataframe(df_transactions)
 
-            # Opción para descargar el archivo Excel
+            # Option to download the Excel file
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 df_transactions.to_excel(writer, index=False)
@@ -157,5 +150,3 @@ if st.button("Process PDFs"):
     end_time = time.time()
     elapsed_time = end_time - start_time
     st.write(f"Processing time: {elapsed_time:.2f} seconds")
-
-
