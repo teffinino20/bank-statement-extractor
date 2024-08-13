@@ -41,6 +41,8 @@ Avoid information related to: "Previous Balance", "Payments/Credits", "New Charg
         "Closing balance", "Account Summary", "Account Activity Details", 
         "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
         "Due Date"
+        
+Ignore values than don't have a description
 
 Bank Statement:
 {text}
