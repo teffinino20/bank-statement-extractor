@@ -1,6 +1,6 @@
-streamlit
-pymupdf
-pandas
-openai
-langchain
-langchain-openai
+streamlit==1.25.0
+pymupdf==1.21.1
+pandas==1.5.3
+openai==0.27.8
+langchain-openai==0.0.4
+langchain==0.0.270
