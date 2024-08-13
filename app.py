@@ -33,7 +33,7 @@ output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
 # Define the prompt template for transaction extraction
 prompt_template = """
-Extract the following information from the provided bank statement text in strict JSON format:
+Extract the following information from the provided bank statement text in JSON format:
 Transaction Date, Description, Amount (include sign if it's negative or a debit transaction), Currency (if mentioned), and Type of transaction (Debit or Credit).
 
 Avoid information related to: "Previous Balance", "Payments/Credits", "New Charges", 
@@ -41,7 +41,7 @@ Avoid information related to: "Previous Balance", "Payments/Credits", "New Charg
         "Closing balance", "Account Summary", "Account Activity Details", 
         "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
         "Due Date"
-Ignore transaction without description
+
 Bank Statement:
 {text}
 
@@ -117,7 +117,7 @@ if st.button("Process PDFs"):
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
-                except (json.JSONDecodeError, openai.error.OpenAIError):
+                except json.JSONDecodeError:
                     continue  # Ignore parts where JSON decoding fails
 
         if all_transactions:
