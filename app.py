@@ -2,6 +2,7 @@ import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
 import json
+import io
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
@@ -68,11 +69,6 @@ prompt_template = """
 Extract the following information from the provided bank statement text in a strict JSON format:
 Transaction Date, Description, Amount (include sign if it's negative or a debit transaction), Currency (if mentioned), and Type of transaction (Debit or Credit).
 
-Avoid information related to: "Previous Balance", "Payments/Credits", "New Charges", 
-        "Fees", "Interest Charged", "Balance", "Total", "Opening balance", 
-        "Closing balance", "Account Summary", "Account Activity Details", 
-        "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
-        "Due Date"
 Ensure the JSON is properly formatted with no additional text.
 
 Bank Statement:
@@ -124,15 +120,22 @@ if st.button("Process PDFs"):
             # Convert the transaction data into a pandas DataFrame
             df_transactions = pd.DataFrame(all_transactions)
 
+            # Create a buffer to write the Excel file to
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df_transactions.to_excel(writer, index=False)
+                writer.save()
+
             # Display the transactions in the app
             st.write("Extracted Transactions")
             st.dataframe(df_transactions)
 
-            # Option to download the Excel file
+            # Provide the download button for the Excel file
             st.download_button(
                 label="Download transactions as Excel",
-                data=df_transactions.to_excel(index=False),
-                file_name="transactions.xlsx"
+                data=buffer.getvalue(),
+                file_name="transactions.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
             st.warning("No transactions were identified.")
