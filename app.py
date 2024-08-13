@@ -11,8 +11,8 @@ from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 openai_api_key = st.secrets["openai"]["api_key"]
 
 # Function to extract text from PDFs
-def extract_text_from_pdf(pdf_path):
-    doc = fitz.open(pdf_path)
+def extract_text_from_pdf(uploaded_file):
+    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
     text = ""
     for page_num in range(len(doc)):
         page = doc.load_page(page_num)
