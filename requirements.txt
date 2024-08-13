@@ -3,4 +3,4 @@ fitz
 pandas
 openai
 langchain-openai
-xlsxwrite
+xlsxwriter
