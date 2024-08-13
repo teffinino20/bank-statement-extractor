@@ -1,3 +1,4 @@
+import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
 import json
@@ -5,14 +6,12 @@ from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-import streamlit as st
-import io
 import time
 
 # Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
 
-# Configuración del modelo LLM
+# LLM model configuration
 llm = ChatOpenAI(
     model_name="gpt-4",
     temperature=0,
@@ -41,8 +40,6 @@ Avoid information related to: "Previous Balance", "Payments/Credits", "New Charg
         "Closing balance", "Account Summary", "Account Activity Details", 
         "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
         "Due Date"
-Ignore transaction than don't have a description.
-Provide the output strictly in valid JSON format without additional explanations or comments.
 
 Bank Statement:
 {text}
@@ -62,7 +59,7 @@ transaction_chain = LLMChain(
     prompt=transaction_prompt
 )
 
-# Extract text from PDF
+# Function to extract text from a PDF file
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     text = ""
@@ -70,8 +67,9 @@ def extract_text_from_pdf(pdf_file):
         text += page.get_text("text")
     return text
 
-# Clean the extracted text
+# Function to clean the text by removing non-relevant information
 def clean_text(text):
+    """Clean the text by removing non-relevant information."""
     lines = text.split('\n')
     cleaned_lines = []
     summary_keywords = [
@@ -87,58 +85,63 @@ def clean_text(text):
             continue
         cleaned_lines.append(line)
     
-    return '\n.join(cleaned_lines)
+    return '\n'.join(cleaned_lines)
 
-# Split text into smaller parts
+# Function to split text into smaller parts
 def split_text(text, max_length=3000):
+    """Split the text into smaller parts with a specified maximum length."""
     return [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
-# Streamlit app configuration
+# Streamlit interface setup
 st.title("PDF Bank Statement Transaction Extractor")
 st.write("Upload a PDF bank statement to extract transactions.")
 
 uploaded_files = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
 
 if st.button("Process PDFs"):
+    start_time = time.time()
     all_transactions = []
 
     if uploaded_files:
-        start_time = time.time()
         for uploaded_file in uploaded_files:
+            # Extract text from the PDF file
             extracted_text = extract_text_from_pdf(uploaded_file)
             cleaned_text = clean_text(extracted_text)
-            text_parts = split_text(cleaned_text)
+            processed_texts = split_text(cleaned_text)
 
-            for idx, text in enumerate(text_parts):
+            # Extract transactions using LLM
+            for text in processed_texts:
                 transactions_data = transaction_chain.predict(text=text)
-
                 try:
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
                 except json.JSONDecodeError:
-                    pass  # Silently ignore the error and continue
-
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        st.write(f"Processing completed in {elapsed_time:.2f} seconds.")
+                    st.error(f"Error decoding JSON for a part of {uploaded_file.name}")
 
         if all_transactions:
+            # Convert transaction data to a pandas DataFrame
             df_transactions = pd.DataFrame(all_transactions)
+
+            # Display the transactions in the app
             st.write("Extracted Transactions")
             st.dataframe(df_transactions)
 
+            # Option to download the Excel file
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 df_transactions.to_excel(writer, index=False)
+                writer.save()
 
             st.download_button(
                 label="Download transactions as Excel",
-                data=buffer.getvalue(),
+                data=buffer,
                 file_name="transactions.xlsx"
             )
         else:
             st.warning("No transactions were identified.")
     else:
         st.warning("Please upload at least one PDF file.")
-
+    
+    end_time = time.time()
+    st.write(f"Processing completed in {end_time - start_time:.2f} seconds.")
