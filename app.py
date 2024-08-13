@@ -2,7 +2,7 @@ import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
 import json
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
