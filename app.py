@@ -33,7 +33,7 @@ output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
 # Define the prompt template for transaction extraction
 prompt_template = """
-Extract the following information from the provided bank statement text in JSON format:
+Extract the following information from the provided bank statement text in a strict JSON format:
 Transaction Date, Description, Amount (include sign if it's negative or a debit transaction), Currency (if mentioned), and Type of transaction (Debit or Credit).
 
 Avoid information related to: "Previous Balance", "Payments/Credits", "New Charges", 
@@ -41,7 +41,7 @@ Avoid information related to: "Previous Balance", "Payments/Credits", "New Charg
         "Closing balance", "Account Summary", "Account Activity Details", 
         "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
         "Due Date"
-
+Ignore transactions if they don't have a description.
 Bank Statement:
 {text}
 
