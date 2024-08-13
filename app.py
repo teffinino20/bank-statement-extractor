@@ -41,9 +41,7 @@ Avoid information related to: "Previous Balance", "Payments/Credits", "New Charg
         "Closing balance", "Account Summary", "Account Activity Details", 
         "Minimum Due", "Available and Pending", "Closing Date", "Payment Due Date",
         "Due Date"
-Ignore transactions that don't have description.
-Provide the output strictly in valid JSON format without additional explanations or comments.
-
+Ignore transaction without description
 Bank Statement:
 {text}
 
@@ -114,13 +112,13 @@ if st.button("Process PDFs"):
 
             # Extract transactions using LLM
             for text in processed_texts:
-                transactions_data = transaction_chain.predict(text=text)
                 try:
+                    transactions_data = transaction_chain.predict(text=text)
                     parsed_transactions = json.loads(transactions_data)
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
-                except json.JSONDecodeError:
-                    st.error(f"Error decoding JSON for a part of {uploaded_file.name}")
+                except (json.JSONDecodeError, openai.error.OpenAIError):
+                    continue  # Ignore parts where JSON decoding fails
 
         if all_transactions:
             # Convert transaction data to a pandas DataFrame
@@ -148,4 +146,3 @@ if st.button("Process PDFs"):
     
     end_time = time.time()
     st.write(f"Processing completed in {end_time - start_time:.2f} seconds.")
-
