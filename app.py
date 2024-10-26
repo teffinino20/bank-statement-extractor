@@ -14,7 +14,7 @@ openai_api_key = st.secrets["openai"]["api_key"]
 
 # LLM model configuration
 llm = ChatOpenAI(
-    model_name="gpt-4",
+    model_name="gpt-3.5-turbo",
     temperature=0,
     max_tokens=4096,
     openai_api_key=openai_api_key
