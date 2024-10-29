@@ -8,6 +8,8 @@ from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 import io
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
@@ -20,7 +22,7 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
-# Define the response schemas for the parser
+# Define response schemas for the parser
 response_schemas = [
     ResponseSchema(name="trans_date", description="Transaction date"),
     ResponseSchema(name="description", description="The transaction description"),
@@ -94,10 +96,25 @@ def split_text(text, max_length=3000):
     return [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
 # Streamlit interface setup
-st.title("PDF Bank Statement Transaction Extractor")
-st.write("Upload a PDF bank statement to extract transactions.")
+st.title("Enhanced PDF Bank Statement Transaction Extractor")
+st.write("Upload a PDF bank statement to extract and visualize transactions.")
 
 uploaded_files = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
+
+# Define expense categories
+expense_categories = {
+    "Restaurants": ["restaurant", "cafe", "dining"],
+    "Utilities": ["electricity", "water", "gas", "internet"],
+    "Entertainment": ["cinema", "theater", "concert", "movie"],
+    "E-commerce": ["amazon", "shop", "online"],
+    # Add more categories as needed
+}
+
+def classify_transaction(description):
+    for category, keywords in expense_categories.items():
+        if any(keyword.lower() in description.lower() for keyword in keywords):
+            return category
+    return "Other"
 
 if st.button("Process PDFs"):
     start_time = time.time()
@@ -124,8 +141,11 @@ if st.button("Process PDFs"):
             # Convert transaction data to a pandas DataFrame
             df_transactions = pd.DataFrame(all_transactions)
 
+            # Classify transactions
+            df_transactions['Category'] = df_transactions['description'].apply(classify_transaction)
+
             # Display the transactions in the app
-            st.write("Extracted Transactions")
+            st.write("Extracted and Classified Transactions")
             st.dataframe(df_transactions)
 
             # Option to download the Excel file
@@ -137,8 +157,29 @@ if st.button("Process PDFs"):
             st.download_button(
                 label="Download transactions as Excel",
                 data=buffer,
-                file_name="transactions.xlsx"
+                file_name="classified_transactions.xlsx"
             )
+
+            # Visualization options
+            st.subheader("Visualizations")
+            
+            # Transaction count by category
+            st.write("Transaction count by category:")
+            category_counts = df_transactions['Category'].value_counts()
+            fig, ax = plt.subplots()
+            category_counts.plot(kind='bar', ax=ax)
+            ax.set_xlabel("Category")
+            ax.set_ylabel("Number of Transactions")
+            st.pyplot(fig)
+
+            # Pie chart of spending by category
+            st.write("Spending distribution by category:")
+            category_sums = df_transactions.groupby("Category")["amount"].sum()
+            fig, ax = plt.subplots()
+            category_sums.plot(kind='pie', autopct='%1.1f%%', startangle=140, ax=ax)
+            ax.set_ylabel("")  # Hide y-label for pie chart
+            st.pyplot(fig)
+
         else:
             st.warning("No transactions were identified.")
     else:
