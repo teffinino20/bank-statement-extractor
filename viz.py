@@ -103,14 +103,9 @@ categories = [
 
 def classify_transaction_gpt(description):
     prompt = (
-        f"Classify the following bank transaction description into one of these categories: {', '.join(categories)}.\n"
-        "Here are some examples to guide the classification:\n"
-        "- Transactions mentioning 'Chevron', 'Exxon', or 'Shell' are typically categorized as 'Transportation'.\n"
-        "- Transactions with terms like 'Grocery', 'Food', or 'Restaurant' go under 'Food & Dining'.\n"
-        "- Descriptions mentioning 'Utilities', 'Electric', or 'Gas Bill' are categorized as 'Utilities'.\n"
-        "- Purchases from places like 'Amazon' or 'Walmart' are usually 'Shopping & Personal'.\n"
-        "- Hotel or travel-related descriptions often fall under 'Entertainment & Recreation'.\n\n"
-        f"Now, classify this transaction:\n\nDescription: '{description}'"
+        f"Classify the following bank transaction description into one of these categories: "
+        f"{', '.join(categories)}. If the description doesn't fit any of these categories, "
+        f"respond with 'Miscellaneous/Other'.\n\nDescription: '{description}'"
     )
     
     try:
