@@ -72,6 +72,7 @@ def extract_text_from_pdf(pdf_file):
 
 # Function to clean the text by removing non-relevant information
 def clean_text(text):
+    """Clean the text by removing non-relevant information."""
     lines = text.split('\n')
     cleaned_lines = []
     summary_keywords = [
@@ -91,43 +92,38 @@ def clean_text(text):
 
 # Function to split text into smaller parts
 def split_text(text, max_length=3000):
+    """Split the text into smaller parts with a specified maximum length."""
     return [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
-# Streamlit interface setup
-st.title("Bank Statement Extractor and Analysis")
-st.write("Upload a PDF bank statement to extract and analyze transactions.")
-
-uploaded_files = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
-
-# Transaction Categories
+# Define categories and GPT-powered classification function
 categories = [
-    "Food & Dining", "Utilities", "Transportation", "Entertainment & Recreation",
-    "Shopping & Personal", "Healthcare", "Business Expenses", "Home & Rent",
-    "Education", "Insurance", "Loan Payments", "Gifts & Donations", "Professional Services",
-    "Taxes", "Miscellaneous/Other"
+    "Food & Dining", "Utilities", "Entertainment & Recreation", "Shopping & Personal",
+    "Transportation", "Healthcare", "Business Expenses", "Home & Rent", "Education",
+    "Insurance", "Loan Payments", "Gifts & Donations", "Professional Services", "Taxes",
+    "Miscellaneous/Other"
 ]
 
-# Classify transactions using GPT
 def classify_transaction_gpt(description):
     prompt = (
         f"Classify the following bank transaction description into one of these categories: "
         f"{', '.join(categories)}. If the description doesn't fit any of these categories, "
         f"respond with 'Miscellaneous/Other'.\n\nDescription: '{description}'"
     )
+    
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=10,
-            temperature=0
-        )
-        category = response['choices'][0]['message']['content'].strip()
+        response = llm.chat(prompt)
+        category = response.choices[0].text.strip()
         return category if category in categories else "Miscellaneous/Other"
     except Exception as e:
         print(f"Error with description '{description}': {e}")
         return "Miscellaneous/Other"
 
-# Main processing
+# Streamlit interface setup
+st.title("PDF Bank Statement Transaction Extractor")
+st.write("Upload a PDF bank statement to extract transactions.")
+
+uploaded_files = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
+
 if st.button("Process PDFs") and uploaded_files:
     start_time = time.time()
     all_transactions = []
@@ -170,7 +166,6 @@ if st.button("Process PDFs") and uploaded_files:
         plt.title("Percentage of Debit vs Credit Transactions")
         st.pyplot(plt)
 
-        # Additional Visualizations
         # Running Balance Plot
         df['Running Balance'] = df['amount'].cumsum()
         plt.figure(figsize=(12, 6))
@@ -200,8 +195,8 @@ if st.button("Process PDFs") and uploaded_files:
         )
     else:
         st.warning("No transactions were identified.")
-else:
-    st.warning("Please upload at least one PDF file.")
     
     end_time = time.time()
     st.write(f"Processing completed in {end_time - start_time:.2f} seconds.")
+else:
+    st.warning("Please upload at least one PDF file.")
