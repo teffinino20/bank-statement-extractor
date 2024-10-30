@@ -113,44 +113,48 @@ if st.button("Process PDFs"):
         if all_transactions:
             df = pd.DataFrame(all_transactions)
             
-            # Classification and cleaning
-            df['Category'] = df['description'].apply(classify_transaction_gpt)
-            df['Amount'] = pd.to_numeric(df['amount'].replace({'\$': '', ',': ''}, regex=True))
-            df = df[~df['description'].isin(["Payment", "ONLINE PAYMENT - THANK YOU"])]
+            # Verify if 'description' column exists
+            if 'description' not in df.columns:
+                st.error("The 'description' column is missing in the extracted data. Check the extraction prompt and JSON parsing.")
+            else:
+                # Classification and cleaning
+                df['Category'] = df['description'].apply(classify_transaction_gpt)
+                df['Amount'] = pd.to_numeric(df['amount'].replace({'\$': '', ',': ''}, regex=True))
+                df = df[~df['description'].isin(["Payment", "ONLINE PAYMENT - THANK YOU"])]
 
-            # Visualizations
-            st.write("### Transaction Summary Table")
-            st.dataframe(df[['trans_date', 'description', 'Amount', 'Category']])
+                # Visualizations
+                st.write("### Transaction Summary Table")
+                st.dataframe(df[['trans_date', 'description', 'Amount', 'Category']])
 
-            # Visualization 1: Transaction count by category
-            plt.figure(figsize=(10, 6))
-            sns.countplot(x='Category', data=df)
-            plt.title("Transaction Count by Category")
-            plt.xticks(rotation=45)
-            st.pyplot(plt)
+                # Visualization 1: Transaction count by category
+                plt.figure(figsize=(10, 6))
+                sns.countplot(x='Category', data=df)
+                plt.title("Transaction Count by Category")
+                plt.xticks(rotation=45)
+                st.pyplot(plt)
 
-            # Visualization 2: Spending by category (pie chart)
-            plt.figure(figsize=(8, 8))
-            df['Category'].value_counts().plot(kind='pie', autopct='%1.1f%%', startangle=140)
-            plt.title("Transaction Distribution by Category")
-            st.pyplot(plt)
+                # Visualization 2: Spending by category (pie chart)
+                plt.figure(figsize=(8, 8))
+                df['Category'].value_counts().plot(kind='pie', autopct='%1.1f%%', startangle=140)
+                plt.title("Transaction Distribution by Category")
+                st.pyplot(plt)
 
-            # Visualization 3: Running Balance Plot
-            df['Running Balance'] = df['Amount'].cumsum()
-            plt.figure(figsize=(12, 6))
-            plt.plot(df['trans_date'], df['Running Balance'])
-            plt.title("Running Balance Over Time")
-            st.pyplot(plt)
+                # Visualization 3: Running Balance Plot
+                df['Running Balance'] = df['Amount'].cumsum()
+                plt.figure(figsize=(12, 6))
+                plt.plot(df['trans_date'], df['Running Balance'])
+                plt.title("Running Balance Over Time")
+                st.pyplot(plt)
 
-            # Download button for processed data
-            buffer = BytesIO()
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False)
-            st.download_button(
-                label="Download transactions as Excel",
-                data=buffer,
-                file_name="processed_transactions.xlsx"
-            )
+                # Download button for processed data
+                buffer = BytesIO()
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False)
+                st.download_button(
+                    label="Download transactions as Excel",
+                    data=buffer,
+                    file_name="processed_transactions.xlsx"
+                )
         else:
             st.warning("No transactions were identified.")
     else:
