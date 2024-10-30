@@ -7,12 +7,12 @@ import openai
 import matplotlib.pyplot as plt
 import seaborn as sns
 from io import BytesIO
+import matplotlib.dates as mdates
+import time
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-import matplotlib.dates as mdates
-import time
 
 # Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
@@ -161,13 +161,13 @@ if st.button("Process PDFs"):
             df = pd.DataFrame(all_transactions)
 
             # Classification and amount cleaning
-            df['Category'] = df['Description'].apply(classify_transaction_gpt)
-            df['Amount'] = df['Amount'].replace({'\$': '', ',': ''}, regex=True).astype(float)
-            df = df[~df['Description'].isin(["Payment", "ONLINE PAYMENT - THANK YOU"])]
+            df['Category'] = df['description'].apply(classify_transaction_gpt)
+            df['Amount'] = df['amount'].replace({'\$': '', ',': ''}, regex=True).astype(float)
+            df = df[~df['description'].isin(["Payment", "ONLINE PAYMENT - THANK YOU"])]
 
             # Visualizations
             st.write("Extracted and Classified Transactions")
-            st.dataframe(df[['Transaction Date', 'Description', 'Amount', 'Category']])
+            st.dataframe(df[['trans_date', 'description', 'Amount', 'Category']])
 
             # Visualization 1: Transaction count by category
             plt.figure(figsize=(10, 6))
@@ -184,24 +184,24 @@ if st.button("Process PDFs"):
             st.pyplot(plt)
 
             # Running Balance Plot
-            df['Transaction Date'] = pd.to_datetime(df['Transaction Date'])
+            df['trans_date'] = pd.to_datetime(df['trans_date'])
             df['Running Balance'] = df['Amount'].cumsum()
             plt.figure(figsize=(12, 6))
-            plt.plot(df['Transaction Date'], df['Running Balance'], marker='o')
+            plt.plot(df['trans_date'], df['Running Balance'], marker='o')
             plt.title("Running Balance Over Time")
             plt.xticks(rotation=45)
             st.pyplot(plt)
 
             # Scatter Plot by Date and Amount
             plt.figure(figsize=(12, 6))
-            sns.scatterplot(data=df, x='Transaction Date', y='Amount', hue='Category', palette="Set2", s=100)
+            sns.scatterplot(data=df, x='trans_date', y='Amount', hue='Category', palette="Set2", s=100, alpha=0.7)
             plt.title("Scatter Plot of Transactions by Date and Amount")
             plt.xticks(rotation=45)
             plt.grid(True)
             st.pyplot(plt)
 
             # Monthly Spending Forecast
-            df['Month'] = df['Transaction Date'].dt.to_period("M")
+            df['Month'] = df['trans_date'].dt.to_period("M")
             monthly_spending = df.groupby('Month')['Amount'].sum()
             plt.figure(figsize=(10, 5))
             monthly_spending.plot(kind='line', label="Actual Spending")
