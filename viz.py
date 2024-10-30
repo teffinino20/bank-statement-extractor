@@ -107,7 +107,6 @@ def extract_text_from_pdf(pdf_file):
 
 # Function to clean the text by removing non-relevant information
 def clean_text(text):
-    """Clean the text by removing non-relevant information."""
     lines = text.split('\n')
     cleaned_lines = []
     summary_keywords = [
@@ -127,7 +126,6 @@ def clean_text(text):
 
 # Function to split text into smaller parts
 def split_text(text, max_length=3000):
-    """Split the text into smaller parts with a specified maximum length."""
     return [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
 # Streamlit interface setup
@@ -142,12 +140,10 @@ if st.button("Process PDFs"):
 
     if uploaded_files:
         for uploaded_file in uploaded_files:
-            # Extract text from the PDF file
             extracted_text = extract_text_from_pdf(uploaded_file)
             cleaned_text = clean_text(extracted_text)
             processed_texts = split_text(cleaned_text)
 
-            # Extract transactions using LLM
             for text in processed_texts:
                 try:
                     transactions_data = transaction_chain.predict(text=text)
@@ -155,42 +151,43 @@ if st.button("Process PDFs"):
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
                 except json.JSONDecodeError:
-                    continue  # Ignore parts where JSON decoding fails
+                    continue
 
         if all_transactions:
-            # Convert transaction data to a pandas DataFrame
             df_transactions = pd.DataFrame(all_transactions)
 
-            # Display the transactions in the app
-            st.write("Extracted Transactions")
-            st.dataframe(df_transactions)
+            # Print out columns to diagnose any naming issues
+            st.write("Extracted columns from parsed transactions:")
+            st.write(df_transactions.head())
 
-            # Clean and classify transactions
-            df_transactions['amount'] = df_transactions['amount'].replace({'\$': '', ',': ''}, regex=True).astype(float)
-            df_transactions['category'] = df_transactions['description'].apply(classify_transaction_gpt)
+            # Ensure column names are in lowercase
+            df_transactions.columns = df_transactions.columns.str.lower()
 
-            # Display classified transactions
-            st.write("Classified Transactions")
-            st.dataframe(df_transactions[['trans_date', 'description', 'amount', 'category']])
+            # Handle potential column renaming to match lowercase references
+            if 'amount' not in df_transactions.columns:
+                st.warning("The 'amount' column is missing in the data.")
+            else:
+                df_transactions['amount'] = df_transactions['amount'].replace({'\$': '', ',': ''}, regex=True).astype(float)
+                df_transactions['category'] = df_transactions['description'].apply(classify_transaction_gpt)
 
-            # Visualization
-            st.write("Transaction Category Distribution")
-            plt.figure(figsize=(10, 6))
-            sns.countplot(data=df_transactions, x='category')
-            plt.xticks(rotation=45)
-            st.pyplot(plt)
+                st.write("Classified Transactions")
+                st.dataframe(df_transactions[['trans_date', 'description', 'amount', 'category']])
 
-            # Download option
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                df_transactions.to_excel(writer, index=False)
-                buffer.seek(0)
-            st.download_button(
-                label="Download transactions as Excel",
-                data=buffer,
-                file_name="transactions_with_categories.xlsx"
-            )
+                st.write("Transaction Category Distribution")
+                plt.figure(figsize=(10, 6))
+                sns.countplot(data=df_transactions, x='category')
+                plt.xticks(rotation=45)
+                st.pyplot(plt)
 
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    df_transactions.to_excel(writer, index=False)
+                    buffer.seek(0)
+                st.download_button(
+                    label="Download transactions as Excel",
+                    data=buffer,
+                    file_name="transactions_with_categories.xlsx"
+                )
         else:
             st.warning("No transactions were identified.")
     else:
