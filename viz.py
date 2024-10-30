@@ -30,11 +30,11 @@ llm = ChatOpenAI(model_name="gpt-4", temperature=0, max_tokens=4096, openai_api_
 
 # Define the response schemas and the parser
 response_schemas = [
-    ResponseSchema(name="trans_date", description="Transaction date"),
-    ResponseSchema(name="description", description="Transaction description"),
-    ResponseSchema(name="amount", description="Transaction amount"),
-    ResponseSchema(name="currency", description="Currency of the transaction", optional=True),
-    ResponseSchema(name="type of transaction", description="Type of transaction: Debit or Credit", optional=True)
+    ResponseSchema(name="Trans_Date", description="Transaction date"),
+    ResponseSchema(name="Description", description="Transaction description"),
+    ResponseSchema(name="Amount", description="Transaction amount"),
+    ResponseSchema(name="Currency", description="Currency of the transaction", optional=True),
+    ResponseSchema(name="Type_of_Transaction", description="Type of transaction: Debit or Credit", optional=True)
 ]
 output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
@@ -113,18 +113,18 @@ if st.button("Process PDFs"):
         if all_transactions:
             df = pd.DataFrame(all_transactions)
             
-            # Verify if 'description' column exists
-            if 'description' not in df.columns:
-                st.error("The 'description' column is missing in the extracted data. Check the extraction prompt and JSON parsing.")
+            # Verify if 'Description' column exists
+            if 'Description' not in df.columns:
+                st.error("The 'Description' column is missing in the extracted data. Check the extraction prompt and JSON parsing.")
             else:
                 # Classification and cleaning
-                df['Category'] = df['description'].apply(classify_transaction_gpt)
-                df['Amount'] = pd.to_numeric(df['amount'].replace({'\$': '', ',': ''}, regex=True))
-                df = df[~df['description'].isin(["Payment", "ONLINE PAYMENT - THANK YOU"])]
+                df['Category'] = df['Description'].apply(classify_transaction_gpt)
+                df['Amount'] = pd.to_numeric(df['Amount'].replace({'\$': '', ',': ''}, regex=True))
+                df = df[~df['Description'].isin(["Payment", "ONLINE PAYMENT - THANK YOU"])]
 
                 # Visualizations
                 st.write("### Transaction Summary Table")
-                st.dataframe(df[['trans_date', 'description', 'Amount', 'Category']])
+                st.dataframe(df[['Trans_Date', 'Description', 'Amount', 'Category']])
 
                 # Visualization 1: Transaction count by category
                 plt.figure(figsize=(10, 6))
@@ -142,7 +142,7 @@ if st.button("Process PDFs"):
                 # Visualization 3: Running Balance Plot
                 df['Running Balance'] = df['Amount'].cumsum()
                 plt.figure(figsize=(12, 6))
-                plt.plot(df['trans_date'], df['Running Balance'])
+                plt.plot(df['Trans_Date'], df['Running Balance'])
                 plt.title("Running Balance Over Time")
                 st.pyplot(plt)
 
