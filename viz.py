@@ -145,54 +145,63 @@ if st.button("Process PDFs") and uploaded_files:
     if all_transactions:
         # Convert transaction data to a DataFrame
         df = pd.DataFrame(all_transactions)
-        df['Category'] = df['description'].apply(classify_transaction_gpt)
-        df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
+        
+        # Print columns for debugging
+        st.write("Extracted columns from parsed transactions:", df.columns)
 
-        # Display the transaction data
-        st.write("Extracted and Classified Transactions")
-        st.dataframe(df)
+        # Ensure necessary columns are present
+        if 'description' not in df.columns:
+            st.warning("The 'description' column is missing in the data.")
+        else:
+            # Apply classification only if 'description' exists
+            df['Category'] = df['description'].apply(classify_transaction_gpt)
+            df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
 
-        # Visualization: Transaction Counts by Category
-        plt.figure(figsize=(10, 6))
-        sns.countplot(data=df, x='Category', order=df['Category'].value_counts().index)
-        plt.xticks(rotation=45)
-        plt.title("Transactions by Category")
-        st.pyplot(plt)
+            # Display the transaction data
+            st.write("Extracted and Classified Transactions")
+            st.dataframe(df)
 
-        # Visualization: Percentage of Credit vs Debit
-        df['Type'] = df['amount'].apply(lambda x: 'Credit' if x > 0 else 'Debit')
-        plt.figure(figsize=(6, 6))
-        df['Type'].value_counts().plot(kind='pie', autopct='%1.1f%%', startangle=140)
-        plt.title("Percentage of Debit vs Credit Transactions")
-        st.pyplot(plt)
+            # Visualization: Transaction Counts by Category
+            plt.figure(figsize=(10, 6))
+            sns.countplot(data=df, x='Category', order=df['Category'].value_counts().index)
+            plt.xticks(rotation=45)
+            plt.title("Transactions by Category")
+            st.pyplot(plt)
 
-        # Running Balance Plot
-        df['Running Balance'] = df['amount'].cumsum()
-        plt.figure(figsize=(12, 6))
-        sns.lineplot(data=df, x=df.index, y='Running Balance', marker="o")
-        plt.title("Running Balance Over Time")
-        st.pyplot(plt)
+            # Visualization: Percentage of Credit vs Debit
+            df['Type'] = df['amount'].apply(lambda x: 'Credit' if x > 0 else 'Debit')
+            plt.figure(figsize=(6, 6))
+            df['Type'].value_counts().plot(kind='pie', autopct='%1.1f%%', startangle=140)
+            plt.title("Percentage of Debit vs Credit Transactions")
+            st.pyplot(plt)
 
-        # Heatmap of Expenses by Day and Category
-        df['Transaction Date'] = pd.to_datetime(df['trans_date'], errors='coerce')
-        df['Day'] = df['Transaction Date'].dt.day
-        pivot_table = df.pivot_table(index='Day', columns='Category', values='amount', aggfunc='sum').fillna(0)
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(pivot_table, cmap="YlGnBu", annot=True, fmt=".2f")
-        plt.title("Heatmap of Expenses per Day by Category")
-        st.pyplot(plt)
+            # Running Balance Plot
+            df['Running Balance'] = df['amount'].cumsum()
+            plt.figure(figsize=(12, 6))
+            sns.lineplot(data=df, x=df.index, y='Running Balance', marker="o")
+            plt.title("Running Balance Over Time")
+            st.pyplot(plt)
 
-        # Download Button
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False)
-            buffer.seek(0)
+            # Heatmap of Expenses by Day and Category
+            df['Transaction Date'] = pd.to_datetime(df['trans_date'], errors='coerce')
+            df['Day'] = df['Transaction Date'].dt.day
+            pivot_table = df.pivot_table(index='Day', columns='Category', values='amount', aggfunc='sum').fillna(0)
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(pivot_table, cmap="YlGnBu", annot=True, fmt=".2f")
+            plt.title("Heatmap of Expenses per Day by Category")
+            st.pyplot(plt)
 
-        st.download_button(
-            label="Download transactions as Excel",
-            data=buffer,
-            file_name="transactions.xlsx"
-        )
+            # Download Button
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False)
+                buffer.seek(0)
+
+            st.download_button(
+                label="Download transactions as Excel",
+                data=buffer,
+                file_name="transactions.xlsx"
+            )
     else:
         st.warning("No transactions were identified.")
     
