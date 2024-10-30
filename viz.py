@@ -6,23 +6,24 @@ from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-import matplotlib.pyplot as plt
-import seaborn as sns
 import io
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
+import openai
 
-# Access OpenAI API key from Streamlit's secrets
+# Accessing the API key from Streamlit's secrets
 openai_api_key = st.secrets["openai"]["api_key"]
 
-# Configure LLM model
+# LLM model configuration
 llm = ChatOpenAI(
-    model_name="gpt-3.5-turbo",
+    model_name="gpt-4",
     temperature=0,
     max_tokens=4096,
     openai_api_key=openai_api_key
 )
 
-# Define response schemas for transaction extraction
+# Define the response schemas for the parser
 response_schemas = [
     ResponseSchema(name="trans_date", description="Transaction date"),
     ResponseSchema(name="description", description="The transaction description"),
@@ -33,7 +34,7 @@ response_schemas = [
 
 output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
-# Define prompt template for transaction extraction
+# Define the prompt template for transaction extraction
 prompt_template = """
 Extract the following information from the provided bank statement text in JSON format:
 Transaction Date, Description, Amount (include sign if it's negative or a debit transaction), Currency (if mentioned), and Type of transaction (Debit or Credit).
@@ -56,11 +57,45 @@ transaction_prompt = PromptTemplate(
     output_parser=output_parser
 )
 
-# Create LLM chain for transaction extraction
+# Create the LLM chain for transaction extraction
 transaction_chain = LLMChain(
     llm=llm,
     prompt=transaction_prompt
 )
+
+# Define categories for classification
+categories = [
+    "Food & Dining", "Utilities", "Transportation", "Entertainment & Recreation",
+    "Shopping & Personal", "Healthcare", "Business Expenses", "Home & Rent",
+    "Education", "Insurance", "Loan Payments", "Gifts & Donations", "Professional Services",
+    "Taxes", "Miscellaneous/Other"
+]
+
+# Define the classification function using GPT
+def classify_transaction_gpt(description):
+    prompt = (
+        f"Classify the following bank transaction description into one of these categories: "
+        f"{', '.join(categories)}.\n"
+        "Here are some examples to guide the classification:\n"
+        "- 'Chevron', 'Exxon', 'Shell' -> 'Transportation'\n"
+        "- 'Grocery', 'Food', 'Restaurant' -> 'Food & Dining'\n"
+        "- 'Utilities', 'Electric', 'Gas Bill' -> 'Utilities'\n"
+        "- 'Amazon', 'Walmart' -> 'Shopping & Personal'\n"
+        "- Hotel or travel descriptions -> 'Entertainment & Recreation'\n\n"
+        f"Now, classify this transaction:\n\nDescription: '{description}'"
+    )
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=10,
+            temperature=0
+        )
+        category = response['choices'][0]['message']['content'].strip()
+        return category if category in categories else "Miscellaneous/Other"
+    except Exception as e:
+        print(f"Error with description '{description}': {e}")
+        return "Miscellaneous/Other"
 
 # Function to extract text from a PDF file
 def extract_text_from_pdf(pdf_file):
@@ -72,6 +107,7 @@ def extract_text_from_pdf(pdf_file):
 
 # Function to clean the text by removing non-relevant information
 def clean_text(text):
+    """Clean the text by removing non-relevant information."""
     lines = text.split('\n')
     cleaned_lines = []
     summary_keywords = [
@@ -91,39 +127,12 @@ def clean_text(text):
 
 # Function to split text into smaller parts
 def split_text(text, max_length=3000):
+    """Split the text into smaller parts with a specified maximum length."""
     return [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
-# Prompt-engineered GPT classification function
-categories = [
-    "Food & Dining", "Utilities", "Transportation", "Entertainment & Recreation",
-    "Shopping & Personal", "Healthcare", "Business Expenses", "Home & Rent",
-    "Education", "Insurance", "Loan Payments", "Gifts & Donations",
-    "Professional Services", "Taxes", "Miscellaneous/Other"
-]
-
-def classify_transaction_gpt(description):
-    prompt = (
-        f"Classify the following bank transaction description into one of these categories: "
-        f"{', '.join(categories)}. If the description doesn't fit any of these categories, "
-        f"respond with 'Miscellaneous/Other'.\n\nDescription: '{description}'"
-    )
-    
-    try:
-        response = llm.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=10,
-            temperature=0
-        )
-        category = response['choices'][0]['message']['content'].strip()
-        return category if category in categories else "Miscellaneous/Other"
-    except Exception as e:
-        print(f"Error with description '{description}': {e}")
-        return "Miscellaneous/Other"
-
-# Streamlit interface
-st.title("Bank Statement Extractor")
-st.write("Upload a PDF bank statement to extract transactions and generate visualizations.")
+# Streamlit interface setup
+st.title("PDF Bank Statement Transaction Extractor and Analyzer")
+st.write("Upload a PDF bank statement to extract transactions, classify, and visualize data.")
 
 uploaded_files = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
 
@@ -146,74 +155,41 @@ if st.button("Process PDFs"):
                     if isinstance(parsed_transactions, list):
                         all_transactions.extend(parsed_transactions)
                 except json.JSONDecodeError:
-                    continue
+                    continue  # Ignore parts where JSON decoding fails
 
         if all_transactions:
-            # Convert transaction data to a DataFrame and standardize column names
-            df = pd.DataFrame(all_transactions)
-            df.columns = df.columns.str.lower()
+            # Convert transaction data to a pandas DataFrame
+            df_transactions = pd.DataFrame(all_transactions)
 
-            # Verify necessary columns
-            if 'description' not in df.columns:
-                st.warning("The 'description' column is missing in the data.")
-            else:
-                # Clean and classify transactions
-                df = df[~df['description'].isin(["Payment", "ONLINE PAYMENT - THANK YOU"])]
-                df['category'] = df['description'].apply(classify_transaction_gpt)
-                df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
+            # Display the transactions in the app
+            st.write("Extracted Transactions")
+            st.dataframe(df_transactions)
 
-                # Display extracted and classified transactions
-                st.write("Extracted and Classified Transactions")
-                st.dataframe(df)
+            # Clean and classify transactions
+            df_transactions['amount'] = df_transactions['amount'].replace({'\$': '', ',': ''}, regex=True).astype(float)
+            df_transactions['category'] = df_transactions['description'].apply(classify_transaction_gpt)
 
-                # Save transactions to Excel
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=False)
-                    buffer.seek(0)
+            # Display classified transactions
+            st.write("Classified Transactions")
+            st.dataframe(df_transactions[['trans_date', 'description', 'amount', 'category']])
 
-                st.download_button(
-                    label="Download transactions as Excel",
-                    data=buffer,
-                    file_name="transactions.xlsx"
-                )
+            # Visualization
+            st.write("Transaction Category Distribution")
+            plt.figure(figsize=(10, 6))
+            sns.countplot(data=df_transactions, x='category')
+            plt.xticks(rotation=45)
+            st.pyplot(plt)
 
-                # Visualization
-                st.subheader("Visualizations")
-
-                # Pie chart of transaction count by category
-                category_counts = df['category'].value_counts()
-                plt.figure(figsize=(8, 8))
-                category_counts.plot(kind='pie', autopct='%1.1f%%', startangle=140)
-                plt.title("Transaction Count by Category")
-                st.pyplot(plt)
-
-                # Debit vs. Credit count
-                transaction_type_counts = df['type of transaction'].value_counts()
-                plt.figure(figsize=(8, 6))
-                sns.barplot(x=transaction_type_counts.index, y=transaction_type_counts.values)
-                plt.title("Count of Debit vs Credit Transactions")
-                plt.xlabel("Type of Transaction")
-                plt.ylabel("Count")
-                st.pyplot(plt)
-
-                # Scatter plot of transactions by category and amount
-                plt.figure(figsize=(10, 6))
-                sns.scatterplot(data=df, x="category", y="amount", hue="category", palette="tab10", s=100)
-                plt.title("Scatter Plot of Transactions by Category and Amount")
-                plt.xticks(rotation=45)
-                st.pyplot(plt)
-
-                # Running balance over time
-                df['transaction date'] = pd.to_datetime(df['transaction date'], errors='coerce')
-                df = df.sort_values('transaction date')
-                df['running_balance'] = df['amount'].cumsum()
-                plt.figure(figsize=(10, 6))
-                sns.lineplot(data=df, x="transaction date", y="running_balance")
-                plt.title("Running Balance Over Time")
-                plt.xlabel("Date")
-                plt.ylabel("Balance")
-                st.pyplot(plt)
+            # Download option
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df_transactions.to_excel(writer, index=False)
+                buffer.seek(0)
+            st.download_button(
+                label="Download transactions as Excel",
+                data=buffer,
+                file_name="transactions_with_categories.xlsx"
+            )
 
         else:
             st.warning("No transactions were identified.")
@@ -222,6 +198,3 @@ if st.button("Process PDFs"):
     
     end_time = time.time()
     st.write(f"Processing completed in {end_time - start_time:.2f} seconds.")
-
-
-    
